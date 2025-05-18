@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+<body style="background-color:rgb(50, 50, 50);">
+    <div id="overlay" class="overlay"></div>
+    
+    <div class="model-choice">
+        Model <i class="arrow down"></i>
+    </div>
+    
+    <div class="model-popup" id="modelPopup">
+        <div class="model-popup-content">
+            <!-- chatgpt -->
+            <div class="model-category">
+                <div class="model-category-title">ChatGPT</div>
+                <div class="model-option">o4-mini</div>
+                <div class="model-option">o3</div>
+                <div class="model-option">o1-pro</div>
+                <div class="model-option">GPT-4.1</div>
+                <div class="model-option">Web</div>
+            </div>
+            
+            <!-- claude -->
+            <div class="model-category">
+                <div class="model-category-title">Claude</div>
+                <div class="model-option">3.7 Sonnet</div>
+                <div class="model-option">3.0 Opus</div>
+                <div class="model-option">3.5 Sonnet</div>
+                <div class="model-option">3.5 Haiku</div>
+                <div class="model-option">3.0 Sonnet</div>
+            </div>
+            
+            <!-- gemini -->
+            <div class="model-category">
+                <div class="model-category-title">Gemini</div>
+                <div class="model-option">1.5 Pro</div>
+                <div class="model-option">2.5 Flash</div>
+                <div class="model-option">2.0 Flash</div>
+                <div class="model-option">1.5 Flash</div>
+                <div class="model-option">Veo 2</div>
+            </div>
+        </div>
+    </div>
+
+
+   <div class="chat-container">
+        <div id="chat-area">
+            <div id="messages-container"></div>
+        </div>
+
+        <div class="input-container" id="input-area">
+            <input type="hidden" id="username" value="person">
+            <input class="input-area" id="comment" placeholder="...waiting..." type="text">
+        </div>
+    </div>
+</body>
+
+<script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+<script>
+
+/* why tf do i have more js than py, in a flask-based website? */
+
+const modelChoice = document.querySelector('.model-choice');
+let arrow = document.querySelector('.arrow');
+const modelPopup = document.getElementById('modelPopup');
+const overlay = document.getElementById('overlay');
+
+
+
+const socket = io();
+const commentInput = document.getElementById('comment');
+const messagesContainer = document.getElementById('messages-container');
+const chatArea = document.getElementById('chat-area');
+const usernameInput = document.getElementById('username');
+
+socket.on('receive_comment', (data) => {
+    const messageDiv = document.createElement('div');
+    
+    // newlines work now
+    const formattedText = data.comment;
+    
+    if (data.username === 'person') {
+        messageDiv.className = 'message human-message';
+        messageDiv.textContent = formattedText;
+    } else {
+        messageDiv.className = 'message ai-message';
+        messageDiv.textContent = formattedText;
+    }
+    
+    messagesContainer.appendChild(messageDiv);
+    
+    // autoscroll
+    chatArea.scrollTop = chatArea.scrollHeight;
+});
+
+/* enter key sends message */
+commentInput.addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        const comment = commentInput.value;
+        const username = usernameInput.value;
+        if (comment && username) {
+            socket.emit('send_comment', { comment, username });
+            commentInput.value = '';
+        }
+    }
+});
+
+
+
+
+
+// hover detect
+modelChoice.addEventListener('mouseenter', function() {
+    console.log('Hovering over model choice!');
+    this.classList.add('hovered');
+});
+
+// hover end detect
+modelChoice.addEventListener('mouseleave', function() {
+    console.log('No longer hovering over model choice');
+    this.classList.remove('hovered');
+});
+
+// toggle popup & arrow
+modelChoice.addEventListener('click', function() {
+    arrow.classList.toggle('down');
+    arrow.classList.toggle('up');
+    
+    // toggle popup and overlay & animation
+    if (modelPopup.classList.contains('visible')) {
+        modelPopup.classList.remove('visible');
+        setTimeout(() => {
+            modelPopup.style.display = 'none';
+            overlay.style.display = 'none';
+        }, 300);
+    } else {
+        modelPopup.style.display = 'block';
+        overlay.style.display = 'block';
+
+        void modelPopup.offsetWidth;
+        modelPopup.classList.add('visible');
+    }
+});
+
+// model select; what next
+const modelOptions = document.querySelectorAll('.model-option');
+
+// Store the selected model name
+let selectedModelName = '';
+
+modelOptions.forEach(option => {
+    option.addEventListener('click', function() {
+        if (this.classList.contains('model-option')) {
+            selectedModelName = this.textContent;
+            const categoryName = this.parentElement.querySelector('.model-category-title').textContent;
+            
+            console.log(`Selected model: ${selectedModelName} from ${categoryName}`);
+
+            socket.emit('send_model', { selectedModelName, categoryName });
+            
+            // updtate model and stay arrow
+            const arrowElement = document.createElement('i');
+            arrowElement.className = 'arrow down';
+            modelChoice.innerHTML = '';
+            modelChoice.textContent = selectedModelName + ' ';
+            modelChoice.appendChild(arrowElement);
+            
+            // close popup
+            modelPopup.classList.remove('visible');
+            modelPopup.style.display = 'none';
+            overlay.style.display = 'none';
+            arrow.classList.remove('up');
+            arrow.classList.add('down');
+        }
+    });
+});
+
+
+
+// close popup if click somewhere outside
+document.addEventListener('click', function(event) {
+    if (!modelChoice.contains(event.target) && !modelPopup.contains(event.target)) {
+        if (modelPopup.classList.contains('visible')) {
+            modelPopup.classList.remove('visible');
+            modelPopup.style.display = 'none';
+            overlay.style.display = 'none';
+            arrow.classList.remove('up');
+            arrow.classList.add('down');
+        }
+    }
+});
+
+</script>
+
+
+<style>
+    /* some bs (don't delete; website not work without) */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: Arial, sans-serif;
+    }
+        
+    /* the pretty border thingy */
+    body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background-color: #f5f5f5;
+    }
+    .chat-container {
+        width: 800px;
+        height: 650px;
+        border: 2px solid rgba(255, 255, 255, 0.338);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.338);
+    }
+    .messages-area {
+        flex-grow: 1;
+        overflow-y: auto;
+    }
+
+
+    /* type message area */
+    .input-container {
+        height: 70px;
+        border-top: 1px solid rgba(255, 255, 255, 0.338);
+        padding: 10px;
+        display: flex;
+        align-items: center;
+    }
+    .input-area {
+        height: 100%;
+        background-color: transparent;
+        width: 100%;
+        border: none;
+        outline: none;
+        color: white;
+        font-size: 16px;
+        padding: 0 15px;
+    }
+    .input-area::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+        text-align: center;
+    }
+
+
+    /* arrow thingy + rotate it */
+    .arrow {
+        position: relative;
+        top: -2px;
+        border: solid black;
+        border-width: 0 3px 3px 0;
+        display: inline-block;
+        padding: 3px;
+        transition: transform 0.2s ease;
+        margin-left: 5px;
+    }
+    .down {
+        transform: rotate(45deg);
+        -webkit-transform: rotate(45deg);
+        top: -2px;
+    }
+    .up {
+        transform: rotate(-135deg);
+        -webkit-transform: rotate(-135deg);
+        top: 1px;
+    }
+
+
+    /* choose model dropdown */
+    .model-choice {
+        position: absolute;
+        top: 10px;
+        left: 30px;
+        z-index: 1001;
+        background-color: transparent;
+        color: white;
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        border-radius: 5px;
+        margin-bottom: 15px;
+        font-size: 18px;
+    }
+    .model-choice.hovered {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    .model-choice:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .model-choice.active {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+
+
+    /* choose model popup */
+    .model-popup {
+        position: absolute;
+        top: 50px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        max-width: 700px;
+        height: 0; 
+        background-color: rgb(60, 60, 60);
+        border: 2px solid rgba(255, 255, 255, 0.338);
+        border-radius: 12px;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        overflow: hidden;
+        opacity: 0;
+        z-index: 1000;
+        transition: width 0.3s ease-in-out, height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    }
+
+    .model-popup.visible {
+        width: 700px;
+        height: auto;
+        opacity: 1;
+    }
+
+    .model-popup-content {
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        visibility: hidden;
+        transition: visibility 0.1s;
+    }
+
+    .model-popup.visible .model-popup-content {
+        visibility: visible; 
+    }
+
+    /* New class for column layout */
+    .model-category {
+        flex: 1;
+        margin: 0 10px;
+    }
+
+    .model-category-title {
+        color: white;
+        font-weight: bold;
+        font-size: 18px;
+        margin-bottom: 15px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .model-option {
+        padding: 8px 12px;
+        color: white;
+        cursor: pointer;
+        border-radius: 5px;
+        margin-bottom: 5px;
+        transition: background-color 0.2s;
+    }
+
+    .model-option:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    /* overlay for dimmer screen */
+    .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5); 
+        display: none;
+        z-index: 999; 
+    }
+
+
+        #chat-area {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    #messages-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    /* message bubbles */
+    .message {
+        max-width: 70%;
+        padding: 12px 15px;
+        border-radius: 18px;
+        color: white;
+        position: relative;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        line-height: 1.4;
+    }
+
+    .ai-message {
+        align-self: flex-start;
+        background-color: #424242;
+        border-bottom-left-radius: 5px;
+    }
+
+    .human-message {
+        align-self: flex-end;
+        background-color: #2e5fff;
+        border-bottom-right-radius: 5px;
+    }
+
+    /* scrollbar is cool now */
+    #chat-area::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    #chat-area::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    #chat-area::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+    }
+</style>
